@@ -1608,6 +1608,7 @@ int main() {
         test_relations();
         test_bulkload();
     }
+    std::cout << "passed";
 
     return 0;
 }
