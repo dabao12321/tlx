@@ -323,6 +323,20 @@ public:
         return tree_.get_stats();
     }
 
+#if TIME_INSERT
+    uint64_t get_insert_locate_time() const {
+        return tree_.get_insert_locate_time();
+    }
+
+    uint64_t get_insert_insert_time() const {
+        return tree_.get_insert_insert_time();
+    }
+    
+    uint64_t get_insert_promote_time() const {
+        return tree_.get_insert_promote_time();
+    }
+#endif
+
     //! \}
 
 public:

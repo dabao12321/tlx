@@ -24,9 +24,14 @@
 #include <ostream>
 #include <utility>
 
+#include <sys/time.h>
+#include <iostream>
+
 #define INTERNAL_MAX 1024
-#define LEAF_MAX 4 * 1024
+#define LEAF_MAX 1 * 1024
 #define BINSEARCH 256 * 1024
+
+#define TIME_INSERT 1
 
 namespace tlx {
 
@@ -1077,7 +1082,7 @@ public:
     //! \}
 
 private:
-    //! \name Tree Object Data Members
+    //! \name 
     //! \{
 
     //! Pointer to the B+ tree's root node, either leaf or inner node.
@@ -1518,6 +1523,35 @@ public:
         return stats_;
     }
 
+#if TIME_INSERT
+    static long get_usecs() {
+        struct timeval st;
+        gettimeofday(&st,NULL);
+        return st.tv_sec*1000000 + st.tv_usec;
+    }
+
+    uint64_t get_insert_locate_time() const {
+        return insert_locate_time;
+    }
+
+    uint64_t get_insert_insert_time() const {
+        return insert_insert_time;
+    }
+    
+    uint64_t get_insert_promote_time() const {
+        return insert_promote_time;
+    }
+
+    // time to find node for insertion
+    uint64_t insert_locate_time = 0;
+
+    // time to insert elem into node array
+    uint64_t insert_insert_time = 0;
+
+    // time to promote and rebalance tree
+    uint64_t insert_promote_time = 0;
+
+#endif
     //! \}
 
 public:
@@ -1884,12 +1918,24 @@ private:
     std::pair<iterator, bool>
     insert_start(const key_type& key, const value_type& value) {
 
+        
+#if TIME_INSERT
+        // timing insertions
+        uint64_t start_time, end_time;
+        start_time = get_usecs();
+#endif
+
         node* newchild = nullptr;
         key_type newkey = key_type();
 
         if (root_ == nullptr) {
             root_ = head_leaf_ = tail_leaf_ = allocate_leaf();
         }
+#if TIME_INSERT
+        // timing insertions
+        end_time = get_usecs();
+        insert_promote_time += end_time - start_time;
+#endif
 
         std::pair<iterator, bool> r =
             insert_descend(root_, key, value, &newkey, &newchild);
@@ -1899,6 +1945,10 @@ private:
             // this only occurs if insert_descend() could not insert the key
             // into the root node, this mean the root is full and a new root
             // needs to be created.
+#if TIME_INSERT
+            // timing insertions
+            start_time = get_usecs();
+#endif
             InnerNode* newroot = allocate_inner(root_->level + 1);
             newroot->slotkey[0] = newkey;
 
@@ -1908,6 +1958,11 @@ private:
             newroot->slotuse = 1;
 
             root_ = newroot;
+#if TIME_INSERT
+            // timing insertions
+            end_time = get_usecs();
+            insert_promote_time += end_time - start_time;
+#endif
         }
 
         // increment size if the item was inserted
@@ -1936,8 +1991,15 @@ private:
         node* n, const key_type& key, const value_type& value,
         key_type* splitkey, node** splitnode) {
 
+#if TIME_INSERT
+        uint64_t start_time, end_time;
+#endif
+
         if (!n->is_leafnode())
         {
+#if TIME_INSERT
+            start_time = get_usecs();
+#endif
             InnerNode* inner = static_cast<InnerNode*>(n);
 
             key_type newkey = key_type();
@@ -1945,6 +2007,10 @@ private:
 
             unsigned short slot = find_lower(inner, key);
 
+#if TIME_INSERT
+            end_time = get_usecs();
+            insert_locate_time += end_time - start_time;
+#endif
             TLX_BTREE_PRINT(
                 "BTree::insert_descend into " << inner->childid[slot]);
 
@@ -1960,6 +2026,9 @@ private:
 
                 if (inner->is_full())
                 {
+#if TIME_INSERT
+                    start_time = get_usecs();
+#endif
                     split_inner_node(inner, splitkey, splitnode, slot);
 
                     TLX_BTREE_PRINT("BTree::insert_descend done split_inner:" <<
@@ -2013,10 +2082,18 @@ private:
                             "BTree::insert_descend switching to "
                             "splitted node " << inner << " slot " << slot);
                     }
+#if TIME_INSERT
+                    end_time = get_usecs();
+                    insert_promote_time += end_time - start_time;
+#endif
                 }
 
                 // move items and put pointer to child node into correct slot
                 TLX_BTREE_ASSERT(slot >= 0 && slot <= inner->slotuse);
+
+#if TIME_INSERT
+                start_time = get_usecs();
+#endif
 
                 std::copy_backward(
                     inner->slotkey + slot, inner->slotkey + inner->slotuse,
@@ -2028,15 +2105,29 @@ private:
                 inner->slotkey[slot] = newkey;
                 inner->childid[slot + 1] = newchild;
                 inner->slotuse++;
+
+#if TIME_INSERT
+                end_time = get_usecs();
+                insert_insert_time += end_time - start_time;
+#endif
             }
 
             return r;
         }
         else // n->is_leafnode() == true
         {
+#if TIME_INSERT
+            start_time = get_usecs();
+#endif
+
             LeafNode* leaf = static_cast<LeafNode*>(n);
 
             unsigned short slot = find_lower(leaf, key);
+
+#if TIME_INSERT
+            end_time = get_usecs();
+            insert_locate_time += end_time - start_time;
+#endif
 
             if (!allow_duplicates &&
                 slot < leaf->slotuse && key_equal(key, leaf->key(slot))) {
@@ -2045,6 +2136,9 @@ private:
 
             if (leaf->is_full())
             {
+#if TIME_INSERT
+                start_time = get_usecs();
+#endif
                 split_leaf_node(leaf, splitkey, splitnode);
 
                 // check if insert slot is in the split sibling node
@@ -2053,7 +2147,15 @@ private:
                     slot -= leaf->slotuse;
                     leaf = static_cast<LeafNode*>(*splitnode);
                 }
+#if TIME_INSERT
+                end_time = get_usecs();
+                insert_promote_time += end_time - start_time;
+#endif
             }
+
+#if TIME_INSERT
+            start_time = get_usecs();
+#endif
 
             // move items and put data item into correct data slot
             TLX_BTREE_ASSERT(slot >= 0 && slot <= leaf->slotuse);
@@ -2064,6 +2166,10 @@ private:
 
             leaf->slotdata[slot] = value;
             leaf->slotuse++;
+#if TIME_INSERT
+            end_time = get_usecs();
+            insert_insert_time += end_time - start_time;
+#endif
 
             if (splitnode && leaf != *splitnode && slot == leaf->slotuse - 1)
             {

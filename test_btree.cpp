@@ -4,7 +4,6 @@
 #include <tlx/container/btree_set.hpp>
 #include <tlx/container/btree.hpp>
 
-
 // #include <tlx/die.hpp>
 
 // #include <cmath>
@@ -84,6 +83,21 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   times[0] = end - start;
   printf("\ninsertion,\t %lu,", end - start);
 
+#if TIME_INSERT
+  // start = get_usecs();
+  // for (int i = 0; i < max_size * 10; i++ ) {
+  //   end = get_usecs();
+  // }
+  // end = get_usecs();
+
+  // printf("\ntime to time %lu", end - start);
+
+  printf("\n\t insert_locate_time: \t %lu", s.get_insert_locate_time());
+  printf("\n\t insert_insert_time: \t %lu", s.get_insert_insert_time());
+  printf("\n\t insert_promote_time: \t %lu", s.get_insert_promote_time());
+  return;
+#endif
+
 
   // SERIAL FIND
   start = get_usecs();
@@ -158,13 +172,6 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu, \t", end - start,
          sum);
 
-  // start = get_usecs();
-  // sum = s.sum();
-  // end = get_usecs();
-  // times[3] = end - start;
-  // printf("\nsum_time, %lu, sum_total, %lu\n", end - start, sum);
-
-
 // #endif
 
 }
@@ -182,7 +189,7 @@ int main() {
 
 
   // SINGLE RUN
-  // test_btree_unordered_insert<uint64_t>(10000000, seed, times);
+  // test_btree_unordered_insert<uint64_t>(1000000, seed, times);
   test_btree_unordered_insert<uint64_t>(100000000, seed, times);
 	// printf("\ninsert time %lu, find time %lu, sumiter time %lu, sum time %lu\n", times[0], times[1], times[2], times[3]);
 	printf("\n");
