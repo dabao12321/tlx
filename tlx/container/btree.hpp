@@ -27,11 +27,14 @@
 #include <sys/time.h>
 #include <iostream>
 
-#define INTERNAL_MAX 1024
-#define LEAF_MAX 1 * 1024
-#define BINSEARCH 256 * 1024
+#define INTERNAL_MAX 256 // size of internal node
+#define LEAF_MAX 1 * 1024 // size of leaf node
+#define BINSEARCH 8 * 1024 // binary search threshold
 
-#define TIME_INSERT 1
+
+#define COUNTING_SEARCH 0 // 1 if using counting search instead of linear/binary
+
+#define TIME_INSERT 0 // 1 if timing insert subcomponents
 
 namespace tlx {
 
@@ -1408,6 +1411,15 @@ private:
     //! places in LeafNode and InnerNode.
     template <typename node_type>
     unsigned short find_lower(const node_type* n, const key_type& key) const {
+
+#if COUNTING_SEARCH
+        // vectorized counting search
+        unsigned short count = 0;
+        for (unsigned short it = 0; it < n->slotuse; it++) {
+            count += key_less(n->key(it), key);
+        }
+        return count;
+#endif
         if (sizeof(*n) > traits::binsearch_threshold)
         {
             if (n->slotuse == 0) return 0;

@@ -22,8 +22,6 @@
 #include <cilk/cilk_api.h>
 #include <parallel.h>
 
-#define PARALLEL_RUNS 0
-#define PARALLEL_FIND_SUM 0
 
 static long get_usecs() {
     struct timeval st;
