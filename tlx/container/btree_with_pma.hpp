@@ -28,7 +28,7 @@
 #include <sys/time.h>
 #include <iostream>
 
-#define INTERNAL_MAX 256
+#define INTERNAL_MAX 32
 #define LEAF_MAX 1 * 1024
 #define BINSEARCH 256 * 1024
 
@@ -1577,18 +1577,23 @@ public:
         {
             const InnerNode* inner = static_cast<const InnerNode*>(n);
             unsigned short slot = find_lower(inner, key);
-
+						// unsigned short slot = find_upper(inner, key);
+#if DEBUG_PRINT
+						printf("searching for %lu, found slot %u\n", key, slot);
+#endif
             n = inner->childid[slot];
         }
 
         const LeafNode* leaf = static_cast<const LeafNode*>(n);
 
         unsigned short slot = leaf->slotdata.search(key);
+#if DEBUG_PRINT
 				if (!key_equal(key, leaf->slotdata.blind_read_key(slot))) {
-					leaf->slotdata.print_pma();
+				  leaf->slotdata.print_pma();
 					printf("searching for %lu, slot %u, num elts %u, read key %lu\n",
 					key, slot, leaf->slotdata.get_num_elts(), leaf->slotdata.blind_read_key(slot));
 				}
+#endif
         return key_equal(key, leaf->slotdata.blind_read_key(slot));
     }
 
@@ -1965,9 +1970,18 @@ private:
 #endif
             InnerNode* newroot = allocate_inner(root_->level + 1);
             newroot->slotkey[0] = newkey;
-
-            newroot->childid[0] = root_;
+            
+						newroot->childid[0] = root_;
             newroot->childid[1] = newchild;
+# if DEBUG_PRINT
+						printf("newkey = %lu\n", newkey);
+						if(newroot->level == 1) {
+							printf("split root, first child\n");
+							((LeafNode*)root_)->slotdata.print_pma();
+							printf("second child\n");
+							((LeafNode*)newchild)->slotdata.print_pma();
+						}
+#endif
 
             newroot->slotuse = 1;
 
@@ -2004,7 +2018,6 @@ private:
     std::pair<iterator, bool> insert_descend(
         node* n, const key_type& key, const value_type& value,
         key_type* splitkey, node** splitnode) {
-				printf("inserting key %lu\n", key);
 
 #if TIME_INSERT
         uint64_t start_time, end_time;
@@ -2152,15 +2165,26 @@ private:
             // if (leaf->is_full())
 						if (leaf->slotdata.is_full()) 
             {
+#if DEBUG_PRINT
 								printf("*** leaf full***\n");
+#endif
 #if TIME_INSERT
                 start_time = get_usecs();
 #endif
                 split_leaf_node(leaf, splitkey, splitnode);
-
+#if DEBUG_PRINT					
+								printf("after split leaf node\n");
+#endif
+								assert(leaf->slotdata.get_num_elts() <= leaf->slotdata.maximum_elements);
+								assert(((LeafNode*)*splitnode)->slotdata.get_num_elts() <= leaf->slotdata.maximum_elements);
+								
 								// check whether the key should be in the left or right post split
-								if (key >= ((LeafNode*)splitnode)->slotdata.get_min()) {
-									leaf = (LeafNode*)splitnode;
+								if (key >= ((LeafNode*)*splitnode)->slotdata.get_min()) {
+									leaf = (LeafNode*)*splitnode;
+#if DEBUG_PRINT
+									printf("key should be in the right\n");
+									leaf->slotdata.print_pma();
+#endif
 								}
 #if TIME_INSERT
                 end_time = get_usecs();
@@ -2174,10 +2198,13 @@ private:
 
 						leaf->slotdata.insert({value, value});
 
+#if PRINT_PMA
 						// debug
 						uint32_t idx = leaf->slotdata.search(value);
 						assert(leaf->slotdata.blind_read_key(idx) == value);
 						leaf->slotdata.print_pma();
+#endif
+
 #if TIME_INSERT
             end_time = get_usecs();
             insert_insert_time += end_time - start_time;
@@ -2199,9 +2226,17 @@ private:
     //! new nodes and it's insertion key in the two parameters.
     void split_leaf_node(LeafNode* leaf,
                          key_type* out_newkey, node** out_newleaf) {
-        LeafNode* newleaf = allocate_leaf();
+        // LeafNode* newleaf = allocate_leaf();
+				LeafNode* newleaf = new LeafNode();
 				auto middle_elt = leaf->slotdata.split(newleaf->slotdata);
-				
+			  // printf("split returned middle elt %lu\n", middle_elt);	
+
+				assert(leaf->slotdata.get_num_elts() <= leaf->slotdata.maximum_elements);
+				assert(newleaf->slotdata.get_num_elts() <= newleaf->slotdata.maximum_elements);
+#if DEBUG_PRINT
+				leaf->slotdata.print_pma();
+				newleaf->slotdata.print_pma();
+#endif
         newleaf->next_leaf = leaf->next_leaf;
         if (newleaf->next_leaf == nullptr) {
             TLX_BTREE_ASSERT(leaf == tail_leaf_);
@@ -2210,7 +2245,7 @@ private:
         else {
             newleaf->next_leaf->prev_leaf = newleaf;
         }
-      
+      	
 				/*
 				TLX_BTREE_ASSERT(leaf->is_full());
 

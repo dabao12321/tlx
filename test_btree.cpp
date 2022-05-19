@@ -17,6 +17,7 @@
 // #include <cilk/cilk.h>
 // #include <cilk/cilk_api.h>
 #include <parallel.h>
+#include "PMA.hpp"
 
 #define PARALLEL_RUNS 0
 #define PARALLEL_FIND_SUM 0
@@ -49,7 +50,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   }
   std::vector<T> data =
       create_random_data<T>(max_size, std::numeric_limits<T>::max(), seed);
-      //create_random_data<T>(max_size, 100, seed);
+      // create_random_data<T>(max_size, 10000, seed);
 
   // std::set<T> inserted_data;
 
@@ -63,19 +64,31 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   // tlx::btree_set<T, std::less<T>, traits> s;
 
   tlx::btree_set<T> s;
+	// PMA<1024, T, true, T> s;
 
   start = get_usecs();
   for (uint32_t i = 1; i < max_size; i++) {
+#if DEBUG_PRINT
     printf("inserting data[%u] = %lu\n", i, data[i]);
+#endif
+		// s.insert({data[i], data[i]});
 		s.insert(data[i]);
-		
-		for(uint32_t j = 1; j <= i; j++) {
-			if (!s.exists(data[j])) {
-				printf("missing elt %lu at idx %u\n", data[j], j);
-			}
-			assert(s.exists(data[j]));
 
+#if DEBUG
+		bool passed = true;
+		for(uint32_t j = 1; j <= i; j++) {
+			// if (!s.has(data[j])) {
+			if (!s.exists(data[j])) {
+				printf("missing data[%u] = %lu\n", j, data[j]);
+				passed = false;
+				// assert(false);
+			}
+			// assert(s.exists(data[j]));
 		}
+
+		assert(passed);
+#endif
+
   }
   end = get_usecs();
 
@@ -88,14 +101,17 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   for (uint32_t i = 1; i < max_size; i++) {
     if (!s.exists(data[i])) {
 			printf("missing elt %lu at idx %u\n", data[i], i);
+			assert(false);
 		}
-		assert(s.exists(data[i]));
+		// assert(s.exists(data[i]));
     // if (node == nullptr) {
     //   printf("\ncouldn't find data in btree at index %u\n", i);
     //   exit(0);
     // }
   }
   end = get_usecs();
+  printf("\nfind all,\t %lu,", end - start);
+	/*
 #if TIME_INSERT
   // start = get_usecs();
   // for (int i = 0; i < max_size * 10; i++ ) {
@@ -186,10 +202,10 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
          sum);
 
 // #endif
-
+	*/
 }
 
-int main() {
+int main(int argc, char** argv) {
   // printf("B tree node internal size %zu\n", sizeof(tlx::InnerNode));
   // printf("B tree node leaf size %zu\n", sizeof(BTreeNodeLeaf<uint64_t,uint64_t>));
   // test_btree_ordered_insert<uint32_t>(129);
@@ -200,10 +216,10 @@ int main() {
   printf("------- UNORDERED INSERT --------\n");
   uint64_t times[4];
 
-
+	int n = atoi(argv[1]);
   // SINGLE RUN
   // test_btree_unordered_insert<uint64_t>(1000000, seed, times);
-  test_btree_unordered_insert<uint64_t>(1000, seed, times);
+  test_btree_unordered_insert<uint64_t>(n, seed, times);
 	// printf("\ninsert time %lu, find time %lu, sumiter time %lu, sum time %lu\n", times[0], times[1], times[2], times[3]);
 	printf("\n");
 
