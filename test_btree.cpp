@@ -1,8 +1,4 @@
-#include <tlx/container/btree_map.hpp>
-#include <tlx/container/btree_multimap.hpp>
-#include <tlx/container/btree_multiset.hpp>
-#include <tlx/container/btree_set.hpp>
-#include <tlx/container/btree.hpp>
+#include <tlx/container/btree_set_with_pma.hpp>
 
 // #include <tlx/die.hpp>
 
@@ -18,16 +14,12 @@
 #include <functional>
 #include <set>
 #include <sys/time.h>
-#include <cilk/cilk.h>
-#include <cilk/cilk_api.h>
+// #include <cilk/cilk.h>
+// #include <cilk/cilk_api.h>
 #include <parallel.h>
 
-
-static long get_usecs() {
-    struct timeval st;
-    gettimeofday(&st,NULL);
-    return st.tv_sec*1000000 + st.tv_usec;
-}
+#define PARALLEL_RUNS 0
+#define PARALLEL_FIND_SUM 0
 
 template <class T>
 std::vector<T> create_random_data(size_t n, size_t max_val,
@@ -74,13 +66,36 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 
   start = get_usecs();
   for (uint32_t i = 1; i < max_size; i++) {
-    s.insert(data[i]);
+    printf("inserting data[%u] = %lu\n", i, data[i]);
+		s.insert(data[i]);
+		
+		for(uint32_t j = 1; j <= i; j++) {
+			if (!s.exists(data[j])) {
+				printf("missing elt %lu at idx %u\n", data[j], j);
+			}
+			assert(s.exists(data[j]));
+
+		}
   }
   end = get_usecs();
 
   times[0] = end - start;
   printf("\ninsertion,\t %lu,", end - start);
 
+	printf("\n");
+  // SERIAL FIND
+  start = get_usecs();
+  for (uint32_t i = 1; i < max_size; i++) {
+    if (!s.exists(data[i])) {
+			printf("missing elt %lu at idx %u\n", data[i], i);
+		}
+		assert(s.exists(data[i]));
+    // if (node == nullptr) {
+    //   printf("\ncouldn't find data in btree at index %u\n", i);
+    //   exit(0);
+    // }
+  }
+  end = get_usecs();
 #if TIME_INSERT
   // start = get_usecs();
   // for (int i = 0; i < max_size * 10; i++ ) {
@@ -188,7 +203,7 @@ int main() {
 
   // SINGLE RUN
   // test_btree_unordered_insert<uint64_t>(1000000, seed, times);
-  test_btree_unordered_insert<uint64_t>(100000000, seed, times);
+  test_btree_unordered_insert<uint64_t>(1000, seed, times);
 	// printf("\ninsert time %lu, find time %lu, sumiter time %lu, sum time %lu\n", times[0], times[1], times[2], times[3]);
 	printf("\n");
 
