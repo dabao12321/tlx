@@ -1,15 +1,7 @@
 #define DEBUG 0
 #define DEBUG_PRINT 0
 
-
-// #include <tlx/die.hpp>
-
-// #include <cmath>
-// #include <cstddef>
-// #include <iostream>
-// #include <set>
-// #include <vector>
-
+#include <fstream>
 #include <random>
 #include <vector>
 #include <algorithm>
@@ -75,31 +67,28 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 #if DEBUG_PRINT
     printf("inserting data[%u] = %lu\n", i, data[i]);
 #endif
-		// s.insert({data[i], data[i]});
 		s.insert(data[i]);
 
 #if DEBUG
+		printf("here\n");
 		bool passed = true;
 		for(uint32_t j = 0; j <= i; j++) {
 			// if (!s.has(data[j])) {
 			if (!s.exists(data[j])) {
 				printf("missing data[%u] = %lu\n", j, data[j]);
 				passed = false;
-				// assert(false);
 			}
-			// assert(s.exists(data[j]));
 		}
 
 		assert(passed);
 #endif
-
   }
   end = get_usecs();
 
-  times[0] = end - start;
+  uint64_t insert_time = end - start;
   printf("\ninsertion,\t %lu,", end - start);
-
 	printf("\n");
+
   // SERIAL FIND
   start = get_usecs();
   for (uint32_t i = 1; i < max_size; i++) {
@@ -107,30 +96,11 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 			printf("missing elt %lu at idx %u\n", data[i], i);
 			assert(false);
 		}
-		// assert(s.exists(data[i]));
-    // if (node == nullptr) {
-    //   printf("\ncouldn't find data in btree at index %u\n", i);
-    //   exit(0);
-    // }
   }
   end = get_usecs();
   printf("\nfind all,\t %lu,\n", end - start);
-	/*
-#if TIME_INSERT
-  // start = get_usecs();
-  // for (int i = 0; i < max_size * 10; i++ ) {
-  //   end = get_usecs();
-  // }
-  // end = get_usecs();
+	uint64_t find_all_time = end - start;
 
-  // printf("\ntime to time %lu", end - start);
-
-  printf("\n\t insert_locate_time: \t %lu", s.get_insert_locate_time());
-  printf("\n\t insert_insert_time: \t %lu", s.get_insert_insert_time());
-  printf("\n\t insert_promote_time: \t %lu", s.get_insert_promote_time());
-  return;
-#endif
-*/
   // PARALLEL FIND 20 MIL
   std::seed_seq seed2{1};
 
@@ -163,9 +133,9 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 	for(int i = 0; i < getWorkers(); i++) {
 		result += partial_sums[i * 8];
 	}
-
   printf("\nparallel find,\t %lu,\tnum found %lu\n", parallel_find_time, result);
 
+#if DEBUG
 	auto correct_sum_set = std::set<T>();
   // SERIAL SUM WITH ITERATOR
   uint64_t correct_sum = 0;
@@ -175,50 +145,51 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 	for(auto el : correct_sum_set) {
 		correct_sum += el;
 	}
-/*
-	printf("correct sum == %lu\n", correct_sum);
+#endif
 
-	std::sort(data.begin(), data.end());
-	for(int i = 0; i < data.size(); i++) {
-		printf("sorted data[%d] = %lu\n", i, data[i]);
-	}
-*/
   start = get_usecs();
   uint64_t sum = 0;
   auto it = s.begin();
   while (it != s.end()) {
     T el = *it;
     sum += el;
-#if DEBUG_PRINT
-		printf("\tadvance iterator, elt %lu\n", el);
-#endif
     ++it;
   }
-  
   end = get_usecs();
-  times[2] = end - start;
+	uint64_t sum_time = end - start;
+#if DEBUG
 	if(sum != correct_sum) {
 		printf("got sum %lu, should be %lu\n", sum, correct_sum);
 		assert(sum == correct_sum);
 	}
-	
   printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu, \tcorrect_sum, \t %lu\n", end - start,
          sum, correct_sum);
-
+#endif
+	printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu\n", end - start,
+         sum);
 
 	// parallel sum
 	start = get_usecs();
   uint64_t parallel_sum = s.psum();
   end = get_usecs();
-  times[2] = end - start;
+	uint64_t psum_time = end - start;
+#if DEBUG
 	if(parallel_sum != correct_sum) {
 		printf("got parallel sum %lu, should be %lu\n", parallel_sum, correct_sum);
 		assert(parallel_sum == correct_sum);
 	}
-
   printf("\npsum_time, \t%lu, \tsum_total, \t%lu, \tcorrect_sum, \t %lu\n", end - start,
          parallel_sum, correct_sum);
-// #endif
+#endif
+	printf("\npsum_time, \t%lu, \tsum_total, \t%lu\n", end - start,
+         parallel_sum);
+
+	uint64_t size = s.get_size();
+	printf("size in bytes = %lu\n", size);
+
+	std::ofstream outfile;
+	outfile.open("pma_times.csv", std::ios_base::app);
+	outfile << insert_time << "," << find_all_time << "," << parallel_find_time << "," << sum_time << "," << psum_time << "," << size << "\n";
 }
 
 int main(int argc, char** argv) {

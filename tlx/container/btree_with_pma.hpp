@@ -29,11 +29,11 @@
 #include <iostream>
 
 #define INTERNAL_MAX 32
-#define LEAF_MAX 128
+#define LEAF_MAX 4 * 1024;
 #define BINSEARCH 256 * 1024
 
 #define TIME_INSERT 0
-#define PARALLEL_CUTOFF 3
+#define PARALLEL_CUTOFF 2
 
 namespace tlx {
 
@@ -1615,13 +1615,48 @@ public:
 		uint64_t psum() {
 			node* n = root_;
 			if(!n) return 0;
-			printf("max height = %d\n", n->level);
 			std::vector<uint64_t> partial_sums(getWorkers() * 8);
 			psum_helper(n, partial_sums);
 			uint64_t count{0};
 			for(int i = 0; i < getWorkers(); i++) {
 				count += partial_sums[i*8];
 			}
+			return count;
+		}
+
+		void size_helper(node* n, std::vector<uint64_t>& partial_sums) {
+			if(n->level >= PARALLEL_CUTOFF) {
+				assert(!n->is_leafnode());
+				InnerNode* inner = (InnerNode*)n;
+				partial_sums[getWorkerNum() * 8] += sizeof(InnerNode);
+
+				parallel_for (uint32_t i = 0; i <= inner->slotuse; i++) {
+					size_helper(inner->childid[i], partial_sums);
+				}
+			} else {
+				if(!n->is_leafnode()) {
+					InnerNode* inner = (InnerNode*)n;
+					partial_sums[getWorkerNum() * 8] += sizeof(InnerNode);
+
+					for (uint32_t i = 0; i <= inner->slotuse; i++) {
+						size_helper(inner->childid[i], partial_sums);
+					}				
+				} else { // we are at a leaf
+					partial_sums[getWorkerNum() * 8] += sizeof(LeafNode);
+				}
+			}
+		}
+
+		uint64_t get_size() {
+			node* n = root_;
+			if(!n) return 0;
+			std::vector<uint64_t> partial_sums(getWorkers() * 8);
+			size_helper(n, partial_sums);
+			uint64_t count{0};
+			for(int i = 0; i < getWorkers(); i++) {
+				count += partial_sums[i*8];
+			}
+			
 			return count;
 		}
 

@@ -353,6 +353,9 @@ public:
 			return tree_.psum();
 		}
 
+		uint64_t get_size() {
+			return tree_.get_size();
+		}
     //! Tries to locate a key in the B+ tree and returns an iterator to the key
     //! slot if found. If unsuccessful it returns end().
     iterator find(const key_type& key) {

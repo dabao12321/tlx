@@ -209,8 +209,10 @@ cmake_check_build_system:
 .PHONY : cmake_check_build_system
 
 TARGET := test_btree 
-CXX = g++-11 -std=c++20 -L/home/ubuntu/xvdf_mounted/cilkrts/build/install/lib
-CXXFLAGS = -O0 -march=native -Wall -g -m64 -I. -IFixedSizePMA/ -DNDEBUG
+# CXX = g++-11 -std=c++20 -L/home/ubuntu/xvdf_mounted/cilkrts/build/install/lib
+CXX = clang++ -std=c++17 -L/home/ubuntu/xvdf_mounted/cilkrts/build/install/lib
+
+CXXFLAGS = -O3 -march=native -Wall -g -m64 -I. -IFixedSizePMA/ -DNDEBUG
 
 ifeq ($(CILK),1)
   CXXFLAGS += -fcilkplus -DCILK=1
