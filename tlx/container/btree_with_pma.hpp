@@ -33,6 +33,7 @@
 #define BINSEARCH 256 * 1024
 
 #define TIME_INSERT 0
+#define PARALLEL_CUTOFF 3
 
 namespace tlx {
 
@@ -418,9 +419,7 @@ public:
 
         //! Dereference the iterator.
         reference operator * () const {
-#if DEBUG_PRINT
-						printf("deref iterator, curr slot %u, elt %lu\n", curr_slot, std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)));
-#endif
+						// printf("deref iterator, curr slot %u, elt %lu\n", curr_slot, std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)));
             return std::get<0>(curr_leaf->slotdata.blind_read(curr_slot));
         }
 
@@ -436,18 +435,20 @@ public:
 
         //! Prefix++ advance the iterator to the next slot.
         iterator& operator ++ () {
-						curr_leaf->slotdata.print_pma();
+						// curr_leaf->slotdata.print_pma();
 						curr_slot++;
+						
+						// printf("before while, curr slot start %u\n", curr_slot);
 						while(curr_slot < leaf_slotmax) {
             // if (curr_slot + 1u < curr_leaf->slotuse) {
               if(std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)) == 0) {
-								printf("\tempty slot at %u\n", curr_slot);
+								// printf("\tempty slot at %u\n", curr_slot);
 								++curr_slot;
 							} else { break; }
-							printf("curr slot = %u, key = %lu, leaf_slotmax = %u\n", curr_slot, curr_leaf->slotdata.blind_read_key(curr_slot), leaf_slotmax);
 						}
 						if (curr_slot < leaf_slotmax) { 
-							assert(std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)));
+							// assert(std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)));
+							// printf("returning curr slot = %u, key = %lu, leaf_slotmax = %u\n", curr_slot, curr_leaf->slotdata.blind_read_key(curr_slot), leaf_slotmax);
 							return *this;
 						}
 #if DEBUG_PRINT
@@ -457,9 +458,9 @@ public:
 #endif
 						// move to the next leaf if we have some left
 						if (curr_slot == leaf_slotmax && curr_leaf->next_leaf != nullptr) {
-								printf("*** moving to the next leaf ***\n");
-								printf("next leaf = \n");
-								curr_leaf->next_leaf->slotdata.print_pma();
+								// printf("*** moving to the next leaf ***\n");
+								// printf("next leaf = \n");
+								// curr_leaf->next_leaf->slotdata.print_pma();
                 curr_leaf = curr_leaf->next_leaf;
                 curr_slot = 0;
             }
@@ -1591,6 +1592,39 @@ public:
     //! \}
 
 public:
+		void psum_helper(node* n, std::vector<uint64_t>& partial_sums) {
+			if(n->level >= PARALLEL_CUTOFF) {
+				assert(!n->is_leafnode());
+				InnerNode* inner = (InnerNode*)n;
+				parallel_for (uint32_t i = 0; i <= inner->slotuse; i++) {
+					psum_helper(inner->childid[i], partial_sums);
+				}
+			} else {
+				if(!n->is_leafnode()) {
+					InnerNode* inner = (InnerNode*)n;
+					for (uint32_t i = 0; i <= inner->slotuse; i++) {
+						psum_helper(inner->childid[i], partial_sums);
+					}				
+				} else { // we are at a leaf
+					LeafNode* leaf = (LeafNode*)n;
+					partial_sums[getWorkerNum() * 8] += leaf->slotdata.sum_keys(); 
+				}
+			}
+		}
+
+		uint64_t psum() {
+			node* n = root_;
+			if(!n) return 0;
+			printf("max height = %d\n", n->level);
+			std::vector<uint64_t> partial_sums(getWorkers() * 8);
+			psum_helper(n, partial_sums);
+			uint64_t count{0};
+			for(int i = 0; i < getWorkers(); i++) {
+				count += partial_sums[i*8];
+			}
+			return count;
+		}
+
     //! \name STL Access Functions Querying the Tree by Descending to a Leaf
     //! \{
 

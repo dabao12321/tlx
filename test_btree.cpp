@@ -1,7 +1,6 @@
 #define DEBUG 0
 #define DEBUG_PRINT 0
 
-#include <tlx/container/btree_set_with_pma.hpp>
 
 // #include <tlx/die.hpp>
 
@@ -22,6 +21,7 @@
 #include <parallel.h>
 #include "PMA.hpp"
 
+#include <tlx/container/btree_set_with_pma.hpp>
 #define PARALLEL_RUNS 0
 #define PARALLEL_FIND_SUM 0
 
@@ -53,8 +53,8 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
     max_size = std::numeric_limits<T>::max();
   }
   std::vector<T> data =
-      // create_random_data<T>(max_size, std::numeric_limits<T>::max(), seed);
-      create_random_data<T>(max_size, 10000, seed);
+      create_random_data<T>(max_size, std::numeric_limits<T>::max(), seed);
+      // create_random_data<T>(max_size, 10000, seed);
 
   // std::set<T> inserted_data;
 
@@ -164,21 +164,25 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 		result += partial_sums[i * 8];
 	}
 
-
-
   printf("\nparallel find,\t %lu,\tnum found %lu\n", parallel_find_time, result);
 
+	auto correct_sum_set = std::set<T>();
   // SERIAL SUM WITH ITERATOR
   uint64_t correct_sum = 0;
-  for (uint32_t i = 1; i < max_size; i++) {
-    correct_sum += data[i];
-  }
+  for (uint32_t i = 0; i < max_size; i++) {
+		correct_sum_set.insert(data[i]);
+	}
+	for(auto el : correct_sum_set) {
+		correct_sum += el;
+	}
+/*
 	printf("correct sum == %lu\n", correct_sum);
 
 	std::sort(data.begin(), data.end());
 	for(int i = 0; i < data.size(); i++) {
 		printf("sorted data[%d] = %lu\n", i, data[i]);
 	}
+*/
   start = get_usecs();
   uint64_t sum = 0;
   auto it = s.begin();
@@ -197,9 +201,23 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 		printf("got sum %lu, should be %lu\n", sum, correct_sum);
 		assert(sum == correct_sum);
 	}
-  printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu, \t", end - start,
-         sum);
+	
+  printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu, \tcorrect_sum, \t %lu\n", end - start,
+         sum, correct_sum);
 
+
+	// parallel sum
+	start = get_usecs();
+  uint64_t parallel_sum = s.psum();
+  end = get_usecs();
+  times[2] = end - start;
+	if(parallel_sum != correct_sum) {
+		printf("got parallel sum %lu, should be %lu\n", parallel_sum, correct_sum);
+		assert(parallel_sum == correct_sum);
+	}
+
+  printf("\npsum_time, \t%lu, \tsum_total, \t%lu, \tcorrect_sum, \t %lu\n", end - start,
+         parallel_sum, correct_sum);
 // #endif
 }
 
