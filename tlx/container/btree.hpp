@@ -28,9 +28,9 @@
 #include <iostream>
 
 #define INTERNAL_MAX 256 // size of internal node
-#define LEAF_MAX 1 * 1024 // size of leaf node
+#define LEAF_MAX 8 * 1024 // size of leaf node
 #define BINSEARCH 8 * 1024 // binary search threshold
-
+#define PARALLEL_CUTOFF 2
 
 #define COUNTING_SEARCH 0 // 1 if using counting search instead of linear/binary
 
@@ -308,6 +308,15 @@ private:
         const key_type& key(size_t s) const {
             return key_of_value::get(slotdata[s]);
         }
+
+				// helper to sum keys in this node
+				uint64_t sum_keys() {
+					uint64_t result = 0;
+					for(int i = 0; i < node::slotuse; i++){
+						result += key(i);
+					}
+					return result;
+				}
 
         //! True if the node's slots are full.
         bool is_full() const {
@@ -1567,6 +1576,75 @@ public:
     //! \}
 
 public:
+		void psum_helper(node* n, std::vector<uint64_t>& partial_sums) {
+				if(n->level >= PARALLEL_CUTOFF) {
+						assert(!n->is_leafnode());
+						InnerNode* inner = (InnerNode*)n;
+						parallel_for (uint32_t i = 0; i <= inner->slotuse; i++) {
+								psum_helper(inner->childid[i], partial_sums);
+						}
+				} else {
+						if(!n->is_leafnode()) {
+								InnerNode* inner = (InnerNode*)n;
+								for (uint32_t i = 0; i <= inner->slotuse; i++) {
+										psum_helper(inner->childid[i], partial_sums);
+								}                
+						} else { // we are at a leaf
+								LeafNode* leaf = (LeafNode*)n;
+								partial_sums[getWorkerNum() * 8] += leaf->sum_keys(); 
+						}
+				}
+		}
+
+		uint64_t psum() {
+				node* n = root_;
+				if(!n) return 0;
+				std::vector<uint64_t> partial_sums(getWorkers() * 8);
+				psum_helper(n, partial_sums);
+				uint64_t count{0};
+				for(int i = 0; i < getWorkers(); i++) {
+						count += partial_sums[i*8];
+				}
+				return count;
+		}
+
+		void size_helper(node* n, std::vector<uint64_t>& partial_sums) {
+				if(n->level >= PARALLEL_CUTOFF) {
+						assert(!n->is_leafnode());
+						InnerNode* inner = (InnerNode*)n;
+						partial_sums[getWorkerNum() * 8] += sizeof(InnerNode);
+
+						parallel_for (uint32_t i = 0; i <= inner->slotuse; i++) {
+								size_helper(inner->childid[i], partial_sums);
+						}
+				} else {
+						if(!n->is_leafnode()) {
+								InnerNode* inner = (InnerNode*)n;
+								partial_sums[getWorkerNum() * 8] += sizeof(InnerNode);
+
+								for (uint32_t i = 0; i <= inner->slotuse; i++) {
+										size_helper(inner->childid[i], partial_sums);
+								}                
+						} else { // we are at a leaf
+								partial_sums[getWorkerNum() * 8] += sizeof(LeafNode);
+						}
+				}
+		}
+
+		uint64_t get_size() {
+				node* n = root_;
+				if(!n) return 0;
+				std::vector<uint64_t> partial_sums(getWorkers() * 8);
+				size_helper(n, partial_sums);
+				uint64_t count{0};
+				for(int i = 0; i < getWorkers(); i++) {
+						count += partial_sums[i*8];
+				}
+				
+				return count;
+		}
+
+
     //! \name STL Access Functions Querying the Tree by Descending to a Leaf
     //! \{
 
