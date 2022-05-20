@@ -29,10 +29,10 @@
 #include <iostream>
 
 #define INTERNAL_MAX 32
-#define LEAF_MAX 1 * 1024
+#define LEAF_MAX 128
 #define BINSEARCH 256 * 1024
 
-#define TIME_INSERT 1
+#define TIME_INSERT 0
 
 namespace tlx {
 
@@ -418,7 +418,10 @@ public:
 
         //! Dereference the iterator.
         reference operator * () const {
-						return std::get<1>(curr_leaf->slotdata.blind_read(curr_slot)); 
+#if DEBUG_PRINT
+						printf("deref iterator, curr slot %u, elt %lu\n", curr_slot, std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)));
+#endif
+            return std::get<0>(curr_leaf->slotdata.blind_read(curr_slot));
         }
 
         //! Dereference the iterator.
@@ -433,22 +436,42 @@ public:
 
         //! Prefix++ advance the iterator to the next slot.
         iterator& operator ++ () {
+						curr_leaf->slotdata.print_pma();
+						curr_slot++;
 						while(curr_slot < leaf_slotmax) {
             // if (curr_slot + 1u < curr_leaf->slotuse) {
               if(std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)) == 0) {
+								printf("\tempty slot at %u\n", curr_slot);
 								++curr_slot;
-							}
-            }
+							} else { break; }
+							printf("curr slot = %u, key = %lu, leaf_slotmax = %u\n", curr_slot, curr_leaf->slotdata.blind_read_key(curr_slot), leaf_slotmax);
+						}
+						if (curr_slot < leaf_slotmax) { 
+							assert(std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)));
+							return *this;
+						}
+#if DEBUG_PRINT
+						printf("at leaf end\n");
+						printf("curr leaf = \n");
+						curr_leaf->slotdata.print_pma();
+#endif
 						// move to the next leaf if we have some left
 						if (curr_slot == leaf_slotmax && curr_leaf->next_leaf != nullptr) {
+								printf("*** moving to the next leaf ***\n");
+								printf("next leaf = \n");
+								curr_leaf->next_leaf->slotdata.print_pma();
                 curr_leaf = curr_leaf->next_leaf;
                 curr_slot = 0;
             }
             else {
                 // this is end()
+#if DEBUG_PRINT
+								printf("*** this is the end ***\n");
+								printf("\tat end of it++, curr slot %u, key %lu\n", curr_slot, curr_leaf->slotdata.blind_read_key(curr_slot));
+								curr_leaf->slotdata.print_pma();
+#endif
                 curr_slot = leaf_slotmax;
             }
-
             return *this;
         }
 
@@ -1362,7 +1385,11 @@ public:
     //! Constructs a read/data-write iterator that points to the first invalid
     //! slot in the last leaf of the B+ tree.
     iterator end() {
-        return iterator(tail_leaf_, tail_leaf_ ? tail_leaf_->slotdata.get_num_elts() : 0);
+				#if DEBUG_PRINT
+				printf("*** end ***\n");
+				tail_leaf_->slotdata.print_pma();
+        #endif
+				return iterator(tail_leaf_, tail_leaf_ ? leaf_slotmax : 0);
     }
 
     //! Constructs a read-only constant iterator that points to the first slot
@@ -1374,7 +1401,7 @@ public:
     //! Constructs a read-only constant iterator that points to the first
     //! invalid slot in the last leaf of the B+ tree.
     const_iterator end() const {
-        return const_iterator(tail_leaf_, tail_leaf_ ? tail_leaf_->slotdata.get_num_elts() : 0);
+        return const_iterator(tail_leaf_, tail_leaf_ ? leaf_slotmax : 0);
     }
 
     //! Constructs a read/data-write reverse iterator that points to the first
@@ -2270,11 +2297,10 @@ private:
                   newleaf->slotdata);
 
         leaf->slotuse = mid;
+				*/
         leaf->next_leaf = newleaf;
         newleaf->prev_leaf = leaf;
 
-        *out_newkey = leaf->key(leaf->slotuse - 1);
-				*/
 				*out_newkey = middle_elt;
         *out_newleaf = newleaf;
     }

@@ -1,3 +1,6 @@
+#define DEBUG 0
+#define DEBUG_PRINT 0
+
 #include <tlx/container/btree_set_with_pma.hpp>
 
 // #include <tlx/die.hpp>
@@ -21,6 +24,7 @@
 
 #define PARALLEL_RUNS 0
 #define PARALLEL_FIND_SUM 0
+
 
 template <class T>
 std::vector<T> create_random_data(size_t n, size_t max_val,
@@ -49,8 +53,8 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
     max_size = std::numeric_limits<T>::max();
   }
   std::vector<T> data =
-      create_random_data<T>(max_size, std::numeric_limits<T>::max(), seed);
-      // create_random_data<T>(max_size, 10000, seed);
+      // create_random_data<T>(max_size, std::numeric_limits<T>::max(), seed);
+      create_random_data<T>(max_size, 10000, seed);
 
   // std::set<T> inserted_data;
 
@@ -67,7 +71,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 	// PMA<1024, T, true, T> s;
 
   start = get_usecs();
-  for (uint32_t i = 1; i < max_size; i++) {
+  for (uint32_t i = 0; i < max_size; i++) {
 #if DEBUG_PRINT
     printf("inserting data[%u] = %lu\n", i, data[i]);
 #endif
@@ -76,7 +80,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 
 #if DEBUG
 		bool passed = true;
-		for(uint32_t j = 1; j <= i; j++) {
+		for(uint32_t j = 0; j <= i; j++) {
 			// if (!s.has(data[j])) {
 			if (!s.exists(data[j])) {
 				printf("missing data[%u] = %lu\n", j, data[j]);
@@ -110,7 +114,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
     // }
   }
   end = get_usecs();
-  printf("\nfind all,\t %lu,", end - start);
+  printf("\nfind all,\t %lu,\n", end - start);
 	/*
 #if TIME_INSERT
   // start = get_usecs();
@@ -126,22 +130,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   printf("\n\t insert_promote_time: \t %lu", s.get_insert_promote_time());
   return;
 #endif
-
-
-  // SERIAL FIND
-  start = get_usecs();
-  for (uint32_t i = 1; i < max_size; i++) {
-    s.find(data[i]);
-    // if (node == nullptr) {
-    //   printf("\ncouldn't find data in btree at index %u\n", i);
-    //   exit(0);
-    // }
-  }
-  end = get_usecs();
-
-  times[1] = end - start;
-  printf("\nfind all,\t %lu,", end - start);
-
+*/
   // PARALLEL FIND 20 MIL
   std::seed_seq seed2{1};
 
@@ -162,9 +151,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 
   start = get_usecs();
   parallel_for (uint32_t i = 0; i < data_to_search.size(); i++) {
-    auto node = s.find(data_to_search[i]);
-		
-		partial_sums[getWorkerNum() * 8] += !(node == s.end());
+		partial_sums[getWorkerNum() * 8] += s.exists(data_to_search[i]);
   }
 
   end = get_usecs();
@@ -177,32 +164,43 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 		result += partial_sums[i * 8];
 	}
 
-  printf("\nparallel find,\t %lu,\tnum found %lu\n", parallel_find_time, result);
 
+
+  printf("\nparallel find,\t %lu,\tnum found %lu\n", parallel_find_time, result);
 
   // SERIAL SUM WITH ITERATOR
   uint64_t correct_sum = 0;
   for (uint32_t i = 1; i < max_size; i++) {
     correct_sum += data[i];
   }
+	printf("correct sum == %lu\n", correct_sum);
 
+	std::sort(data.begin(), data.end());
+	for(int i = 0; i < data.size(); i++) {
+		printf("sorted data[%d] = %lu\n", i, data[i]);
+	}
   start = get_usecs();
   uint64_t sum = 0;
   auto it = s.begin();
   while (it != s.end()) {
     T el = *it;
     sum += el;
+#if DEBUG_PRINT
+		printf("\tadvance iterator, elt %lu\n", el);
+#endif
     ++it;
   }
   
   end = get_usecs();
   times[2] = end - start;
-  printf("\ncorrect sum total: \t %lu", correct_sum);
+	if(sum != correct_sum) {
+		printf("got sum %lu, should be %lu\n", sum, correct_sum);
+		assert(sum == correct_sum);
+	}
   printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu, \t", end - start,
          sum);
 
 // #endif
-	*/
 }
 
 int main(int argc, char** argv) {
