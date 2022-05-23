@@ -185,7 +185,9 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
          parallel_sum);
 
 	uint64_t size = s.get_size();
+	double leaf_density = s.get_leaf_density();
 	printf("size in bytes = %lu\n", size);
+	printf("avg density = %f\n", leaf_density);
 
 	std::ofstream outfile;
 	outfile.open("pma_times.csv", std::ios_base::app);

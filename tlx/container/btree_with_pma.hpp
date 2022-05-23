@@ -29,7 +29,7 @@
 #include <iostream>
 
 #define INTERNAL_MAX 32
-#define LEAF_MAX 32; //1 * 1024;
+#define LEAF_MAX 8 * 1024;
 #define BINSEARCH 256 * 1024
 
 #define TIME_INSERT 0
@@ -437,7 +437,12 @@ public:
         iterator& operator ++ () {
 						// curr_leaf->slotdata.print_pma();
 						curr_slot++;
-						
+						/*
+					  // skip to next leaf if you hit an empty spot due to packed left	
+						if(std::get<0>(curr_leaf->slotdata.blind_read(curr_slot)) == 0) {
+							curr_slot = curr_leaf->slotdata.next_leaf(curr_slot);
+						}
+						*/
 						// printf("before while, curr slot start %u\n", curr_slot);
 						while(curr_slot < leaf_slotmax) {
             // if (curr_slot + 1u < curr_leaf->slotuse) {
@@ -1660,6 +1665,20 @@ public:
 			return count;
 		}
 
+		double get_leaf_density() {
+			LeafNode* leaf = head_leaf_;
+			uint64_t elts_so_far = 0;
+			uint64_t slots_so_far = 0;
+			while (leaf) { // (leaf != tail_leaf_) {
+				// leaf->slotdata.print_pma();
+				elts_so_far += leaf->slotdata.get_total_density();
+				slots_so_far += LEAF_MAX;
+				leaf = leaf->next_leaf;
+			}
+			printf("elts %lu, slots %lu\n", elts_so_far, slots_so_far);
+			double avg_density = (double) elts_so_far / (double) slots_so_far;
+			return avg_density;
+		}
     //! \name STL Access Functions Querying the Tree by Descending to a Leaf
     //! \{
 
