@@ -89,6 +89,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   printf("\ninsertion,\t %lu,", end - start);
 	printf("\n");
 
+#if TIMING_EXPERIMENTS
   // SERIAL FIND
   start = get_usecs();
   for (uint32_t i = 1; i < max_size; i++) {
@@ -184,14 +185,18 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 	printf("\npsum_time, \t%lu, \tsum_total, \t%lu\n", end - start,
          parallel_sum);
 
+#endif
+
 	uint64_t size = s.get_size();
 	double leaf_density = s.get_leaf_density();
 	printf("size in bytes = %lu\n", size);
 	printf("avg density = %f\n", leaf_density);
 
+#if TIMING_EXPERIMENTS
 	std::ofstream outfile;
 	outfile.open("pma_times.csv", std::ios_base::app);
 	outfile << insert_time << "," << find_all_time << "," << parallel_find_time << "," << sum_time << "," << psum_time << "," << size << "\n";
+#endif
 }
 
 int main(int argc, char** argv) {
