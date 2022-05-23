@@ -96,7 +96,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   return;
 #endif
 
-
+#if TIMING_EXPERIMENTS
   // SERIAL FIND
   start = get_usecs();
   for (uint32_t i = 0; i < max_size; i++) {
@@ -187,9 +187,13 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 assert(parallel_sum == sum);
 printf("\npsum_time, \t%lu, \tsum_total, \t%lu\n", end - start,
           parallel_sum);
+#endif
 
 	uint64_t size = s.get_size();
 	printf("size in bytes = %lu\n", size);
+ 	double leaf_density = s.get_leaf_density();
+	printf("avg density = %f\n", leaf_density);
+
 }
 
 int main(int argc, char** argv) {

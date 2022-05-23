@@ -1644,6 +1644,21 @@ public:
 				return count;
 		}
 
+		double get_leaf_density() {
+			LeafNode* leaf = head_leaf_;
+			uint64_t elts_so_far = 0;
+			uint64_t slots_so_far = 0;
+			while (leaf) { // (leaf != tail_leaf_) {
+				// leaf->slotdata.print_pma();
+				elts_so_far += leaf->slotuse;
+				slots_so_far += LEAF_MAX;
+				leaf = leaf->next_leaf;
+			}
+			printf("elts %lu, slots %lu\n", elts_so_far, slots_so_far);
+			double avg_density = (double) elts_so_far / (double) slots_so_far;
+			return avg_density;
+		}
+
 
     //! \name STL Access Functions Querying the Tree by Descending to a Leaf
     //! \{
