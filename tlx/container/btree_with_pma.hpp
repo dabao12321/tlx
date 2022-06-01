@@ -2313,7 +2313,8 @@ private:
             start_time = get_usecs();
 #endif
 
-						leaf->slotdata.insert({value, value});
+						// use version of insert that takes the slot to insert it at
+						leaf->slotdata.insert_known_slot({value, value}, slot);
 
 #if PRINT_PMA
 						// debug
