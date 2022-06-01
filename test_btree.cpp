@@ -196,6 +196,40 @@ printf("\npsum_time, \t%lu, \tsum_total, \t%lu\n", end - start,
 
 }
 
+template <class T>
+void test_btree_parallel_unordered_insert(uint64_t max_size, std::seed_seq &seed, int num_copies) {
+  if (max_size > std::numeric_limits<T>::max()) {
+    max_size = std::numeric_limits<T>::max();
+  }
+  std::vector<T> data =
+      create_random_data<T>(max_size, std::numeric_limits<T>::max(), seed);
+
+  uint64_t start, end;
+
+	std::vector<tlx::btree_set<T>> trees(num_copies);
+
+  start = get_usecs();
+	parallel_for(uint32_t j = 0; j < num_copies; j++) {
+		for (uint32_t i = 0; i < max_size; i++) {
+			trees[j].insert(data[i]);
+		}
+	}
+  end = get_usecs();
+
+  uint64_t insert_time = end - start;
+  printf("\ninsertion with %d copies at %lu elts,\t %lu,", num_copies, max_size, insert_time);
+	printf("\n");
+  
+	start = get_usecs();
+	parallel_for(uint32_t j = 0; j < num_copies; j++) {
+		trees[j].psum();
+	}
+  end = get_usecs();
+	printf("sum time = %lu\n", end - start);
+
+}
+
+
 int main(int argc, char** argv) {
   // printf("B tree node internal size %zu\n", sizeof(tlx::InnerNode));
   // printf("B tree node leaf size %zu\n", sizeof(BTreeNodeLeaf<uint64_t,uint64_t>));
@@ -211,8 +245,9 @@ int main(int argc, char** argv) {
 
   // SINGLE RUN
   // test_btree_unordered_insert<uint64_t>(1000000, seed, times);
-  test_btree_unordered_insert<uint64_t>(n, seed, times);
+  // test_btree_unordered_insert<uint64_t>(n, seed, times);
 	// printf("\ninsert time %lu, find time %lu, sumiter time %lu, sum time %lu\n", times[0], times[1], times[2], times[3]);
+	test_btree_parallel_unordered_insert<uint64_t>(n, seed, 16);
 	printf("\n");
 
 // #endif
