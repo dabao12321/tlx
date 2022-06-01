@@ -1974,9 +1974,11 @@ private:
             const LeafNode* leaf = static_cast<const LeafNode*>(n);
             LeafNode* newleaf = allocate_leaf();
 
+						/*
             newleaf->slotuse = leaf->slotuse;
             std::copy(leaf->slotdata, leaf->slotdata + leaf->slotuse,
                       newleaf->slotdata);
+						*/
 
             if (head_leaf_ == nullptr)
             {
