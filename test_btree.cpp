@@ -76,9 +76,10 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   end = get_usecs();
 
   uint64_t insert_time = end - start;
-  printf("\ninsertion,\t %lu,", end - start);
+  printf("\ninsertion,\t %lu,", insert_time);
 	printf("\n");
-	
+
+	/*
   // SERIAL FIND
   start = get_usecs();
   for (uint32_t i = 1; i < max_size; i++) {
@@ -125,6 +126,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 	}
   printf("\nparallel find,\t %lu,\tnum found %lu\n", parallel_find_time, result);
 
+	*/
 #if DEBUG
 	auto correct_sum_set = std::set<T>();
   // SERIAL SUM WITH ITERATOR
@@ -155,7 +157,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu, \tcorrect_sum, \t %lu\n", end - start,
          sum, correct_sum);
 #endif
-	printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu\n", end - start,
+	printf("\nsum_time with iterator, \t%lu, \tsum_total, \t%lu\n", sum_time,
          sum);
 
 	// parallel sum
@@ -171,7 +173,7 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
   printf("\npsum_time, \t%lu, \tsum_total, \t%lu, \tcorrect_sum, \t %lu\n", end - start,
          parallel_sum, correct_sum);
 #endif
-	printf("\npsum_time, \t%lu, \tsum_total, \t%lu\n", end - start,
+	printf("\npsum_time, \t%lu, \tsum_total, \t%lu\n", psum_time,
          parallel_sum);
 //#endif
 	uint64_t size = s.get_size();
@@ -179,11 +181,13 @@ void test_btree_unordered_insert(uint64_t max_size, std::seed_seq &seed, uint64_
 	printf("size in bytes = %lu\n", size);
 	printf("avg density = %f\n", leaf_density);
 
+/*
 #if TIMING_EXPERIMENTS
 	std::ofstream outfile;
 	outfile.open("pma_times.csv", std::ios_base::app);
 	outfile << insert_time << "," << find_all_time << "," << parallel_find_time << "," << sum_time << "," << psum_time << "," << size << "\n";
 #endif
+*/
 }
 
 template <class T>
@@ -218,13 +222,18 @@ void test_btree_parallel_unordered_insert(uint64_t max_size, std::seed_seq &seed
 	printf("\n");
   
 	start = get_usecs();
-	parallel_for(uint32_t j = 0; j < num_copies; j++) {
-  	// tlx::btree_set<T> s;
-		trees[j].psum();
-	}
+
+	// for(int i = 0; i < 100; i++) {
+		parallel_for(uint32_t j = 0; j < num_copies; j++) {
+			// tlx::btree_set<T> s;
+			trees[j].psum();
+		}
+  //	}
   end = get_usecs();
 	printf("sum time = %lu\n", end - start);
 
+	double leaf_density = trees[0].get_leaf_density();
+	printf("avg density = %f\n", leaf_density);
 }
 int main(int argc, char** argv) {
   // printf("B tree node internal size %zu\n", sizeof(tlx::InnerNode));
@@ -239,9 +248,8 @@ int main(int argc, char** argv) {
 
 	int n = atoi(argv[1]);
   // SINGLE RUN
-  // test_btree_unordered_insert<uint64_t>(1000000, seed, times);
-  // test_btree_unordered_insert<uint64_t>(n, seed, times);
-	// printf("\ninsert time %lu, find time %lu, sumiter time %lu, sum time %lu\n", times[0], times[1], times[2], times[3]);
+  // test_btree_unordered_insert<uint64_t>(n, seed, times);	
+	
 	test_btree_parallel_unordered_insert<uint64_t>(n, seed, 16);
 
 	printf("\n");

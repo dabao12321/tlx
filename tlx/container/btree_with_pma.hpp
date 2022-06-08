@@ -29,7 +29,7 @@
 #include <iostream>
 
 #define INTERNAL_MAX 32
-#define LEAF_MAX 8 * 1024;
+#define LEAF_MAX 1024;
 #define BINSEARCH 256 * 1024
 
 #define TIME_INSERT 0
@@ -294,9 +294,25 @@ private:
         //! Double linked list pointers to traverse the leaves
         LeafNode* next_leaf;
 
+			  template <typename T> struct pair_check { 
+					using type = T;
+					using rest = T;
+					static constexpr bool is_pair = false;
+				};
+
+			  template <typename T1, typename T2> struct pair_check<std::pair<T1, T2>> {
+				  using type = T1;
+					using rest = T2;
+					static constexpr bool is_pair = true;
+				};
+
+				static constexpr bool is_pair = pair_check<value_type>::is_pair;
+
+				using PMA_type = typename std::conditional<is_pair, PMA<leaf_slotmax, key_type, true, typename pair_check<value_type>::rest>,  PMA<leaf_slotmax, key_type, true>>::type; 
         //! Array of (key, data) pairs
         // value_type slotdata[leaf_slotmax]; // NOLINT
-				PMA<leaf_slotmax, key_type, true, value_type> slotdata;
+				// PMA<leaf_slotmax, key_type, true, value_type> slotdata;
+			  PMA_type slotdata;
 
         //! Set variables to initial values
         void initialize() {
@@ -2314,7 +2330,7 @@ private:
 #endif
 
 						// use version of insert that takes the slot to insert it at
-						leaf->slotdata.insert_known_slot({value, value}, slot);
+						leaf->slotdata.insert_known_slot(value, slot);
 
 #if PRINT_PMA
 						// debug
