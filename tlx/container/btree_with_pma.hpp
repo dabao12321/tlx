@@ -29,7 +29,7 @@
 #include <iostream>
 
 #define INTERNAL_MAX 32
-#define LEAF_MAX 1024;
+#define LEAF_MAX 8 * 1024;
 #define BINSEARCH 256 * 1024
 
 #define TIME_INSERT 0
