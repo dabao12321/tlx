@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/tlx_sort_parallel_mergesort_test.dir/sort_parallel_mergesort_test.o  -o tlx_sort_parallel_mergesort_test -ltlx 

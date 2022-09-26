@@ -28,8 +28,15 @@
 #include <sys/time.h>
 #include <iostream>
 
+// #include <mutex>	
+// #include <shared_mutex>	
+// #include <ParallelTools/ParallelTools/parallel.h>	
+// #include <ParallelTools/ParallelTools/reducer.h>	
+// #include <ParallelTools/ParallelTools/Lock.hpp>
+
+
 #define INTERNAL_MAX 32
-#define LEAF_MAX 1024;
+#define LEAF_MAX 8 * 1024;
 #define BINSEARCH 256 * 1024
 
 #define TIME_INSERT 0
@@ -134,7 +141,8 @@ template <typename Key, typename Value,
           typename Compare = std::less<Key>,
           typename Traits = btree_default_traits<Key, Value>,
           bool Duplicates = false,
-          typename Allocator = std::allocator<Value> >
+          typename Allocator = std::allocator<Value>,
+          bool concurrent = false>
 class BTree
 {
 public:
@@ -179,7 +187,7 @@ public:
 
     //! Typedef of our own type
     typedef BTree<key_type, value_type, key_of_value, key_compare,
-                  traits, allow_duplicates, allocator_type> Self;
+                  traits, allow_duplicates, allocator_type, concurrent> Self;
 
     //! Size type used to count keys
     typedef size_t size_type;
@@ -245,6 +253,8 @@ private:
         //! Define an related allocator for the InnerNode structs.
         typedef typename std::allocator_traits<Allocator>::template rebind_alloc<InnerNode> alloc_type;
 
+        mutable ReaderWriterLock mutex_;
+
         //! Number of key slotuse use, so the number of valid children or data
         //! pointers
         unsigned short slotuse;
@@ -293,6 +303,10 @@ private:
 
         //! Double linked list pointers to traverse the leaves
         LeafNode* next_leaf;
+
+        mutable Lock mutex_;
+
+				uint64_t buffer;
 
 			  template <typename T> struct pair_check { 
 					using type = T;
@@ -408,7 +422,7 @@ public:
         //! Also friendly to the base btree class, because erase_iter() needs
         //! to read the curr_leaf and curr_slot values directly.
         friend class BTree<key_type, value_type, key_of_value, key_compare,
-                           traits, allow_duplicates, allocator_type>;
+                           traits, allow_duplicates, allocator_type, concurrent>;
 
         // The macro TLX_BTREE_FRIENDS can be used by outside class to access
         // the B+ tree internals. This was added for wxBTreeDemo to be able to
@@ -1095,14 +1109,20 @@ public:
      * fetched using get_stats().
      */
     struct tree_stats {
+        
+        using size_type_concurrent=ParallelTools::Reducer_sum<size_type>;	
+        typedef typename std::conditional<concurrent,	
+                                        size_type_concurrent,	
+                                        size_type>::type size_type2;
+
         //! Number of items in the B+ tree
-        size_type size;
+        size_type2 size;
 
         //! Number of leaves in the B+ tree
-        size_type leaves;
+        size_type2 leaves;
 
         //! Number of inner nodes in the B+ tree
-        size_type inner_nodes;
+        size_type2 inner_nodes;
 
         //! Base B+ tree parameter: The number of key/data slots in each leaf
         static const unsigned short leaf_slots = Self::leaf_slotmax;
@@ -1135,6 +1155,8 @@ private:
 
     //! Pointer to the B+ tree's root node, either leaf or inner node.
     node* root_;
+
+    mutable ReaderWriterLock mutex;	
 
     //! Pointer to first leaf in the double linked leaf chain.
     LeafNode* head_leaf_;
@@ -1230,7 +1252,7 @@ public:
 
         //! Friendly to the btree class so it may call the constructor
         friend class BTree<key_type, value_type, key_of_value, key_compare,
-                           traits, allow_duplicates, allocator_type>;
+                           traits, allow_duplicates, allocator_type, concurrent>;
 
     public:
         //! Function call "less"-operator resulting in true if x < y.
@@ -1313,7 +1335,7 @@ private:
     LeafNode * allocate_leaf() {
         LeafNode* n = new (leaf_node_allocator().allocate(1)) LeafNode();
         n->initialize();
-        stats_.leaves++;
+        --stats_.leaves;
         return n;
     }
 
@@ -1321,7 +1343,7 @@ private:
     InnerNode * allocate_inner(unsigned short level) {
         InnerNode* n = new (inner_node_allocator().allocate(1)) InnerNode();
         n->initialize(level);
-        stats_.inner_nodes++;
+        ++stats_.inner_nodes;
         return n;
     }
 
@@ -1333,14 +1355,14 @@ private:
             typename LeafNode::alloc_type a(leaf_node_allocator());
             std::allocator_traits<typename LeafNode::alloc_type>::destroy(a, ln);
             std::allocator_traits<typename LeafNode::alloc_type>::deallocate(a, ln, 1);
-            stats_.leaves--;
+            --stats_.leaves;
         }
         else {
             InnerNode* in = static_cast<InnerNode*>(n);
             typename InnerNode::alloc_type a(inner_node_allocator());
             std::allocator_traits<typename InnerNode::alloc_type>::destroy(a, in);
             std::allocator_traits<typename InnerNode::alloc_type>::deallocate(a, in, 1);
-            stats_.inner_nodes--;
+            --stats_.inner_nodes;
         }
     }
 
@@ -1685,12 +1707,14 @@ public:
 			LeafNode* leaf = head_leaf_;
 			uint64_t elts_so_far = 0;
 			uint64_t slots_so_far = 0;
-			while (leaf) { // (leaf != tail_leaf_) {
-				// leaf->slotdata.print_pma();
+			uint64_t sum = 0;
+			while (leaf) {
+				sum += leaf->slotdata.sum_keys();
 				elts_so_far += leaf->slotdata.get_total_density();
 				slots_so_far += LEAF_MAX;
 				leaf = leaf->next_leaf;
 			}
+			printf("sum = %lu\n", sum);
 			printf("elts %lu, slots %lu\n", elts_so_far, slots_so_far);
 			double avg_density = (double) elts_so_far / (double) slots_so_far;
 			return avg_density;
@@ -2067,10 +2091,23 @@ private:
 
     //! Start the insertion descent at the current root and handle root splits.
     //! Returns true if the item was inserted
-    std::pair<iterator, bool>
-    insert_start(const key_type& key, const value_type& value) {
+    template <bool optimism = true> std::pair<iterator, bool>
+    insert_start(const key_type& key, const value_type& value, int cpu_id = -1) {
 
-        
+        if constexpr (concurrent) {
+            if constexpr (optimism) {
+                if (cpu_id == -1) {
+                    cpu_id = sched_getcpu();
+                }
+                // printf("trying to lock the main lock in shared mode\n");
+                mutex.read_lock(cpu_id);
+                // printf("locked the main lock in shared mode\n");
+            } else {
+                // printf("trying to lock the main lock in exclusive mode\n");
+                mutex.write_lock();
+                // printf("locked the main lock in exclusive mode\n");
+            }
+        }
 #if TIME_INSERT
         // timing insertions
         uint64_t start_time, end_time;
@@ -2081,16 +2118,37 @@ private:
         key_type newkey = key_type();
 
         if (root_ == nullptr) {
+            if constexpr (concurrent) {	
+                if constexpr (optimism) {	
+                    // printf("unlocking the main lock in shared mode\n");	
+                    mutex.read_unlock(cpu_id);	
+                    return insert_start<false>(key, value, cpu_id);	
+                }	
+            }
             root_ = head_leaf_ = tail_leaf_ = allocate_leaf();
         }
+        auto lock_p = &mutex;
 #if TIME_INSERT
         // timing insertions
         end_time = get_usecs();
         insert_promote_time += end_time - start_time;
 #endif
 
-        std::pair<iterator, bool> r =
-            insert_descend(root_, key, value, &newkey, &newchild);
+        std::tuple<iterator, bool, bool> r =
+            insert_descend<optimism>(root_, key, value, &newkey, &newchild, &lock_p, cpu_id);
+        
+        if constexpr (concurrent) {	
+            if constexpr (optimism) {	
+                if (lock_p) {	
+                    lock_p->read_unlock(cpu_id);	
+                }	
+                if (std::get<2>(r)) {	
+                    // printf("unlocking the main lock in shared mode\n");	
+                    // mutex.read_unlock();	
+                    return insert_start<false>(key, value, cpu_id);	
+                }	
+            }	
+        }
 
         if (newchild)
         {
@@ -2127,7 +2185,7 @@ private:
         }
 
         // increment size if the item was inserted
-        if (r.second) ++stats_.size;
+        if (std::get<1>(r)) ++stats_.size;
 
 #ifdef TLX_BTREE_DEBUG
         if (debug) print(std::cout);
@@ -2138,7 +2196,13 @@ private:
             TLX_BTREE_ASSERT(exists(key));
         }
 
-        return r;
+        // return r;
+        if constexpr (concurrent && !optimism) {
+            if (lock_p) {
+                lock_p->write_unlock();
+            }
+        }
+        return {std::get<0>(r), std::get<1>(r)};
     }
 
     /*!
@@ -2148,9 +2212,10 @@ private:
      * slot. If the node overflows, then it must be split and the new split node
      * inserted into the parent. Unroll / this splitting up to the root.
     */
-    std::pair<iterator, bool> insert_descend(
+    template<bool optimism> 
+    std::tuple<iterator, bool, bool> insert_descend(
         node* n, const key_type& key, const value_type& value,
-        key_type* splitkey, node** splitnode) {
+        key_type* splitkey, node** splitnode, ReaderWriterLock ** parent_lock, int cpu_id) {
 
 #if TIME_INSERT
         uint64_t start_time, end_time;
@@ -2162,6 +2227,24 @@ private:
             start_time = get_usecs();
 #endif
             InnerNode* inner = static_cast<InnerNode*>(n);
+            InnerNode* original_inner = inner;	
+            if constexpr (concurrent) {	
+                if constexpr (optimism) {	
+                    // printf("trying to lock a inner node lock %p in shared mode\n", inner);	
+                    inner->mutex_.read_lock(cpu_id);	
+                    (*parent_lock)->read_unlock(cpu_id);	
+                    *parent_lock = nullptr;	
+                    // printf("locked a inner node lock %p in shared mode\n", inner);	
+                } else {	
+                    // printf("trying to lock a inner node lock %p in exclusive mode\n", inner);	
+                    inner->mutex_.write_lock();	
+                    // if (inner->slotuse < inner_slotmax-1) {	
+                    //     (*parent_lock)->write_unlock();	
+                    //     *parent_lock = nullptr;	
+                    // }	
+                    // printf("locked a inner node lock %p in exclusive mode\n", inner);	
+                }	
+            }
 
             key_type newkey = key_type();
             node* newchild = nullptr;
@@ -2175,9 +2258,27 @@ private:
             TLX_BTREE_PRINT(
                 "BTree::insert_descend into " << inner->childid[slot]);
 
-            std::pair<iterator, bool> r =
-                insert_descend(inner->childid[slot],
-                               key, value, &newkey, &newchild);
+            auto lock_p = &inner->mutex_;	
+            std::tuple<iterator, bool, bool> r =
+                insert_descend<optimism>(inner->childid[slot],
+                               key, value, &newkey, &newchild, &lock_p, cpu_id);
+
+            if constexpr (concurrent && optimism) {	
+              if (lock_p) {	
+                if (inner->level == 1 && std::get<2>(r) && !inner->is_full()) {	
+                  if (lock_p->try_upgrade_release_on_fail(cpu_id)) {	
+                    r = insert_descend<false>(inner->childid[slot], key, value,	
+                                              &newkey, &newchild, &lock_p,	
+                                              cpu_id);	
+                  } else {	
+                    lock_p = nullptr;	
+                  }	
+                } else {	
+                  lock_p->read_unlock(cpu_id);	
+                  lock_p = nullptr;	
+                }	
+              }	
+            }
 
             if (newchild)
             {
@@ -2230,6 +2331,11 @@ private:
                         split->childid[0] = newchild;
                         *splitkey = newkey;
 
+                        if (concurrent) {	
+                            // printf("unlocking exclusive node lock from %p\n", inner);	
+                            inner->mutex_.write_unlock();	
+                        }
+
                         return r;
                     }
                     else if (slot >= inner->slotuse + 1)
@@ -2273,6 +2379,14 @@ private:
 #endif
             }
 
+            if constexpr (concurrent) {	
+                if  (lock_p)  {	
+                    // when we are optimistic we can unlock on the way down	
+                    // printf("unlocking exclusive node lock from %p\n", original_inner);	
+                    original_inner->mutex_.write_unlock();	
+                }	
+            }
+            
             return r;
         }
         else // n->is_leafnode() == true
@@ -2282,6 +2396,18 @@ private:
 #endif
 
             LeafNode* leaf = static_cast<LeafNode*>(n);
+            LeafNode* original_leaf = leaf;
+            if constexpr (concurrent) {
+                // printf("trying to lock leaf lock from %p\n", leaf);
+                leaf->mutex_.lock();
+                if constexpr (optimism) {
+                    if (!leaf->slotdata.is_full()) {
+                        (*parent_lock)->read_unlock(cpu_id);
+                        *parent_lock = nullptr;
+                    }
+                }
+                // printf("locked leaf lock from %p\n", leaf);
+            }
 
             unsigned short slot = find_lower(leaf, key);
 
@@ -2292,11 +2418,17 @@ private:
 						// trying to insert key that is already here
             if (!allow_duplicates &&
                 slot < leaf_slotmax && key_equal(key, leaf->slotdata.blind_read_key(slot))) {
-                return std::pair<iterator, bool>(iterator(leaf, slot), false);
+                
+                if constexpr (concurrent) {	
+                    // printf("unlcoked leaf lock %p\n", leaf);	
+                    leaf->mutex_.unlock();	
+                }
+
+                return std::tuple<iterator, bool, bool>(iterator(leaf, slot), false, false);
             }
 
             // if (leaf->is_full())
-						if (leaf->slotdata.is_full()) 
+			if (leaf->slotdata.is_full()) 
             {
 #if DEBUG_PRINT
 								printf("*** leaf full***\n");
@@ -2304,6 +2436,13 @@ private:
 #if TIME_INSERT
                 start_time = get_usecs();
 #endif
+                if constexpr (concurrent) {	
+                    if constexpr (optimism) {	
+                        // printf("unlcoked leaf lock %p\n", leaf);	
+                        leaf->mutex_.unlock();	
+                        return {{},{},true};	
+                    }	
+                }
                 split_leaf_node(leaf, splitkey, splitnode);
 #if DEBUG_PRINT					
 								printf("after split leaf node\n");
@@ -2351,8 +2490,12 @@ private:
                 // last slot of the old node. then the splitkey must be updated.
                 *splitkey = key;
             }
+            if constexpr (concurrent) {	
+                // printf("unlocked leaf lock %p\n", leaf);	
+                original_leaf->mutex_.unlock();	
+            }
 
-            return std::pair<iterator, bool>(iterator(leaf, slot), true);
+            return std::tuple<iterator, bool, bool>(iterator(leaf, slot), true, false);
         }
     }
 
@@ -3888,13 +4031,13 @@ private:
             *minkey = ((LeafNode*)n)->slotdata.get_min();
             *maxkey = ((LeafNode*)n)->slotdata.get_max();
 
-            vstats.leaves++;
+            ++vstats.leaves;
             vstats.size += ((LeafNode*)n)->slotdata.get_num_elts();
         }
         else // !n->is_leafnode()
         {
             const InnerNode* inner = static_cast<const InnerNode*>(n);
-            vstats.inner_nodes++;
+            ++vstats.inner_nodes;
 
             tlx_die_unless(inner == root_ || !inner->is_underflow());
             tlx_die_unless(inner->slotuse > 0);

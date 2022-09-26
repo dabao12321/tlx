@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/tlx_die_test.dir/die_test.o  -o tlx_die_test -ltlx 

@@ -15,6 +15,12 @@
 #include <memory>
 #include <utility>
 
+#include <mutex>	
+#include <shared_mutex>	
+#include <ParallelTools/ParallelTools/parallel.h>	
+#include <ParallelTools/ParallelTools/reducer.h>	
+#include <ParallelTools/ParallelTools/Lock.hpp>
+
 #include <tlx/container/btree_with_pma.hpp>
 
 namespace tlx {
@@ -37,7 +43,8 @@ namespace tlx {
 template <typename Key_,
           typename Compare_ = std::less<Key_>,
           typename Traits_ = btree_default_traits<Key_, Key_>,
-          typename Alloc_ = std::allocator<Key_> >
+          typename Alloc_ = std::allocator<Key_>,
+          bool concurrent = false>
 class btree_set
 {
 public:
@@ -73,7 +80,7 @@ public:
     typedef key_type value_type;
 
     //! Typedef of our own type
-    typedef btree_set<key_type, key_compare, traits, allocator_type> self;
+    typedef btree_set<key_type, key_compare, traits, allocator_type, concurrent> self;
 
     //! Key Extractor Struct
     struct key_of_value {
@@ -83,7 +90,7 @@ public:
 
     //! Implementation type of the btree_base
     typedef BTree<key_type, value_type, key_of_value, key_compare,
-                  traits, false, allocator_type> btree_impl;
+                  traits, false, allocator_type, concurrent> btree_impl;
 
     //! Function class comparing two value_type keys.
     typedef typename btree_impl::value_compare value_compare;

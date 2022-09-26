@@ -1,0 +1,30 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/ubuntu/tlx/tests/container/btree_test.cpp
+tlx/container/btree_map.hpp
+-
+tlx/container/btree_multimap.hpp
+-
+tlx/container/btree_multiset.hpp
+-
+tlx/container/btree_set.hpp
+-
+tlx/die.hpp
+-
+cmath
+-
+cstddef
+-
+iostream
+-
+set
+-
+vector
+-
+

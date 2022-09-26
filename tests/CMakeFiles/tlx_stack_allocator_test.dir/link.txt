@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/tlx_stack_allocator_test.dir/stack_allocator_test.o  -o tlx_stack_allocator_test -ltlx 

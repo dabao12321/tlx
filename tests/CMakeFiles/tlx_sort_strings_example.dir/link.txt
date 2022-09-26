@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/tlx_sort_strings_example.dir/sort_strings_example.o  -o tlx_sort_strings_example -ltlx 

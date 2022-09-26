@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/tlx_counting_ptr_test.dir/counting_ptr_test.o  -o tlx_counting_ptr_test -ltlx 

@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/ubuntu/tlx/tests/thread_pool_test.cpp
+numeric
+-
+string
+-
+vector
+-
+tlx/die.hpp
+-
+tlx/thread_pool.hpp
+-
+

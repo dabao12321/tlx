@@ -1,3 +1,10 @@
 [submodule "FixedSizePMA"]
 	path = FixedSizePMA
 	url = https://github.com/wheatman/FixedSizePMA.git
+
+[submodule "ParallelTools"]
+	path = ParallelTools
+	url = https://github.com/wheatman/ParallelTools.git
+[submodule "leafDS"]
+	path = leafDS
+	url = https://github.com/itshelenxu/leafDS.git

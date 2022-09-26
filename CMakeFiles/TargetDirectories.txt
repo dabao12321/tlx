@@ -1,0 +1,15 @@
+/home/ubuntu/tlx/CMakeFiles/install/strip.dir
+/home/ubuntu/tlx/CMakeFiles/install/local.dir
+/home/ubuntu/tlx/CMakeFiles/install.dir
+/home/ubuntu/tlx/CMakeFiles/list_install_components.dir
+/home/ubuntu/tlx/CMakeFiles/rebuild_cache.dir
+/home/ubuntu/tlx/CMakeFiles/edit_cache.dir
+/home/ubuntu/tlx/CMakeFiles/test.dir
+/home/ubuntu/tlx/tlx/CMakeFiles/install/strip.dir
+/home/ubuntu/tlx/tlx/CMakeFiles/install/local.dir
+/home/ubuntu/tlx/tlx/CMakeFiles/install.dir
+/home/ubuntu/tlx/tlx/CMakeFiles/list_install_components.dir
+/home/ubuntu/tlx/tlx/CMakeFiles/rebuild_cache.dir
+/home/ubuntu/tlx/tlx/CMakeFiles/edit_cache.dir
+/home/ubuntu/tlx/tlx/CMakeFiles/test.dir
+/home/ubuntu/tlx/tlx/CMakeFiles/tlx.dir

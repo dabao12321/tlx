@@ -5,11 +5,13 @@
 #if CILK == 1
 #include <cilk/cilk.h>
 #include <cilk/cilk_api.h>
-#include <cilk/reducer_opadd.h>
-#include <cilk/reducer_opxor.h>
+//#include <cilk/reducer_opadd.h>
+//#include <cilk/reducer_opxor.h>
 #include <sstream>
 #include <iostream>
 #include <cstdlib>
+
+
 #define parallel_for cilk_for
 #define parallel_main main
 #define parallel_for_1 _Pragma("cilk grainsize = 1") parallel_for

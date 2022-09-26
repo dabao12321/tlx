@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/tlx_delegate_test.dir/delegate_test.o  -o tlx_delegate_test -ltlx 
