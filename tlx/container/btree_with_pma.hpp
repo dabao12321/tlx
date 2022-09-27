@@ -36,7 +36,7 @@
 
 
 #define INTERNAL_MAX 32
-#define LEAF_MAX 8 * 1024;
+#define LEAF_MAX 32;
 #define BINSEARCH 256 * 1024
 
 #define TIME_INSERT 0
@@ -1335,7 +1335,7 @@ private:
     LeafNode * allocate_leaf() {
         LeafNode* n = new (leaf_node_allocator().allocate(1)) LeafNode();
         n->initialize();
-        --stats_.leaves;
+        ++stats_.leaves;
         return n;
     }
 
@@ -2503,10 +2503,11 @@ private:
     //! new nodes and it's insertion key in the two parameters.
     void split_leaf_node(LeafNode* leaf,
                          key_type* out_newkey, node** out_newleaf) {
+                printf("splitting leaf node");
         // LeafNode* newleaf = allocate_leaf();
 				LeafNode* newleaf = new LeafNode();
 				auto middle_elt = leaf->slotdata.split(newleaf->slotdata);
-			  // printf("split returned middle elt %lu\n", middle_elt);	
+			//   printf("split returned middle elt %lu\n", middle_elt);	
 
 				assert(leaf->slotdata.get_num_elts() <= leaf->slotdata.maximum_elements);
 				assert(newleaf->slotdata.get_num_elts() <= newleaf->slotdata.maximum_elements);
