@@ -36,7 +36,7 @@
 
 
 #define INTERNAL_MAX 32
-#define LEAF_MAX 32;
+#define LEAF_MAX 16;
 #define BINSEARCH 256 * 1024
 
 #define TIME_INSERT 0
@@ -2091,7 +2091,7 @@ private:
 
     //! Start the insertion descent at the current root and handle root splits.
     //! Returns true if the item was inserted
-    template <bool optimism = true> std::pair<iterator, bool>
+    template <bool optimism = false> std::pair<iterator, bool>
     insert_start(const key_type& key, const value_type& value, int cpu_id = -1) {
 
         if constexpr (concurrent) {
@@ -2503,9 +2503,10 @@ private:
     //! new nodes and it's insertion key in the two parameters.
     void split_leaf_node(LeafNode* leaf,
                          key_type* out_newkey, node** out_newleaf) {
-                printf("splitting leaf node");
-        // LeafNode* newleaf = allocate_leaf();
-				LeafNode* newleaf = new LeafNode();
+                // printf("splitting leaf node");
+                LeafNode* newleaf = allocate_leaf();
+
+				// LeafNode* newleaf = new LeafNode(); // doesn't increment stats
 				auto middle_elt = leaf->slotdata.split(newleaf->slotdata);
 			//   printf("split returned middle elt %lu\n", middle_elt);	
 
@@ -3900,7 +3901,7 @@ private:
 
     //! \}
 
-#ifdef TLX_BTREE_DEBUG
+// #ifdef TLX_BTREE_DEBUG
 
 public:
     //! \name Debug Printing
@@ -3923,8 +3924,9 @@ public:
 
         while (n)
         {
-            os << "  " << n << std::endl;
-
+            os << "  " << n << "  " << std::endl;
+            n->slotdata.print_pma();
+            // os << "  " << n->slotdata.print_pma(); << std::endl;
             n = n->next_leaf;
         }
     }
@@ -3983,7 +3985,7 @@ private:
     }
 
     //! \}
-#endif
+// #endif
 
 public:
     //! \name Verification of B+ Tree Invariants

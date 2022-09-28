@@ -548,7 +548,7 @@ public:
 
     //! \}
 
-#ifdef TLX_BTREE_DEBUG
+// #ifdef TLX_BTREE_DEBUG
 
 public:
     //! \name Debug Printing
@@ -567,7 +567,7 @@ public:
     }
 
     //! \}
-#endif
+// #endif
 
 public:
     //! \name Verification of B+ Tree Invariants

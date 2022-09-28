@@ -51,25 +51,29 @@ std::tuple<bool, uint64_t, uint64_t> test_concurrent_btreeset(
   tlx::btree_set<T> serial_set;
 
   start = get_usecs();
-  for (uint32_t i = 0; i < max_size; i++) {
+  for (uint32_t i = 1; i < max_size; i++) {
     serial_set.insert(i);
   }
   end = get_usecs();
   int64_t serial_time = end - start;
   printf("inserted all the data serially in %lu\n", end - start);
 
+  serial_set.print_leaves(std::cout);
+
   tlx::btree_set<T, std::less<T>, tlx::btree_default_traits<T, T>,
                  std::allocator<T>, true>
       concurrent_set;
 
   start = get_usecs();
-  cilk_for(uint32_t i = 0; i < max_size; i++) {
+  cilk_for(uint32_t i = 1; i < max_size; i++) {
     concurrent_set.insert(i);
   }
 
   end = get_usecs();
   uint64_t parallel_time = end - start;
   printf("inserted all the data concurrently in %lu\n", end - start);
+
+  concurrent_set.print_leaves(std::cout);
 
   if (serial_set.size() != concurrent_set.size()) {
     printf("the sizes don't match, got %lu, expetected %lu\n",
